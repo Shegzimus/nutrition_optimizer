@@ -16,8 +16,8 @@ products = [
     {"name": "Peanut Butter (500g)", "price_per_unit": 3.0, "net_weight": 500, "protein_per_100g": 25, "calories_per_100g": 588, "fats_per_100g": 50, "carbs_per_100g": 20},
     {"name": "Brown Rice (1kg)", "price_per_unit": 4.0, "net_weight": 1000, "protein_per_100g": 7.5, "calories_per_100g": 370, "fats_per_100g": 2.7, "carbs_per_100g": 77},
 ]
-budget_cap= 3000
-calorie_cap= 15000
+budget_cap= 4000
+calorie_cap= 20000
 
 # Macronutrient Ratios (in percentages)
 protein_ratio = 30  # 30% protein
@@ -43,33 +43,50 @@ problem = LpProblem("Optimize_Grocery_List", LpMaximize)
 
 # Define decision variable properties
 x = {p["name"]: LpVariable(f"x_{p['name']}", lowBound=0, cat="Integer") for p in products}
-z = {p["name"]: LpVariable(f"z_{p['name']}", lowBound=0, upBound=1, cat="Continuous") for p in products}
+# z = {p["name"]: LpVariable(f"z_{p['name']}", lowBound=0, upBound=1, cat="Continuous") for p in products}
 
 
 # Objective: Maximize protein intake
-problem += lpSum(p["protein_per_100g"] * z[p["name"]] for p in products), "Maximize_Protein"
+# problem += lpSum(p["protein_per_100g"] * z[p["name"]] for p in products), "Maximize_Protein"
+
+problem += lpSum(p["protein_per_100g"] * (p["net_weight"] * x[p["name"]] / 100) for p in products), "Maximize_Protein"
+
+
 
 # Constraints
 # Protein target
-problem += lpSum(p["protein_per_100g"] * z[p["name"]] for p in products) >= protein_target, "Protein_Target"
+# problem += lpSum(p["protein_per_100g"] * z[p["name"]] for p in products) >= protein_target, "Protein_Target"
+
+problem += lpSum(p["protein_per_100g"] * (p["net_weight"] * x[p["name"]] / 100) for p in products) >= protein_target, "Protein_Target"
+
+
 
 # Fat target (calories-based)
-problem += lpSum(p["fats_per_100g"] * z[p["name"]] * 9 for p in products) == fat_calories, "Fat_Target"
+# problem += lpSum(p["fats_per_100g"] * z[p["name"]] * 9 for p in products) >= fat_calories * 0.95, "Fat_Target_Lower"
+# problem += lpSum(p["fats_per_100g"] * z[p["name"]] * 9 for p in products) <= fat_calories * 1.05, "Fat_Target_Upper"
+problem += lpSum(p["fats_per_100g"] * (p["net_weight"] * x[p["name"]] / 100) * 9 for p in products) == fat_calories, "Fat_Target"
+
 
 # Carb target (calories-based)
-problem += lpSum(p["carbs_per_100g"] * z[p["name"]] * 4 for p in products) == carb_calories, "Carb_Target"
+# problem += lpSum(p["carbs_per_100g"] * z[p["name"]] * 4 for p in products) == carb_calories, "Carb_Target"
+problem += lpSum(p["carbs_per_100g"] * (p["net_weight"] * x[p["name"]] / 100) * 4 for p in products) == carb_calories, "Carb_Target"
+
 
 # Budget cap
+# problem += lpSum(p["price_per_unit"] * x[p["name"]] for p in products) <= budget_cap, "Budget_Cap"
 problem += lpSum(p["price_per_unit"] * x[p["name"]] for p in products) <= budget_cap, "Budget_Cap"
 
-# Calorie cap
-problem += lpSum(p["calories_per_100g"] * z[p["name"]] * 10 for p in products) <= calorie_cap, "Calorie_Cap"
 
-# Linking z_n and x_n
-for p in products:
-    product_name = p["name"]
-    net_weight = p["net_weight"]
-    problem += z[product_name] * p["net_weight"] * x[product_name] == 100, f"Linking_{product_name}"
+# Calorie cap
+# problem += lpSum(p["calories_per_100g"] * z[p["name"]] * 10 for p in products) <= calorie_cap, "Calorie_Cap"
+problem += lpSum(p["calories_per_100g"] * (p["net_weight"] * x[p["name"]] / 100) for p in products) <= calorie_cap, "Calorie_Cap"
+
+
+# # Linking z_n and x_n
+# for p in products:
+#     product_name = p["name"]
+#     net_weight = p["net_weight"]
+#     problem += z[product_name] == (p["net_weight"] * x[product_name]) / 100, f"Linking_{product_name}"
 
 # Solve the problem
 problem.solve()
@@ -81,6 +98,11 @@ print("Status:", problem.status)
 #     print(f"{product_name}:")
 #     print(f"  Fraction of 100g purchased (z_n): {z[product_name].varValue:.2f}")
 #     print(f"  Number of units purchased (x_n): {int(x[product_name].varValue) if x[product_name].varValue is not None else 0}")
+
+for product in products:
+    product_name = product["name"]
+    units_purchased = int(x[product_name].varValue) if x[product_name].varValue is not None else 0
+    print(f"{product_name}: {units_purchased} units")
 
 data = []
 
@@ -112,11 +134,11 @@ df = pd.DataFrame(data)
 print(df)
 
 # Print total nutritional values
-total_protein = sum(p["protein_per_100g"] * z[p["name"]].varValue for p in products)
+total_protein = sum(p["protein_per_100g"] * x[p["name"]].varValue for p in products)
 total_price = sum(p["price_per_unit"] * x[p["name"]].varValue for p in products)
-total_calories = sum(p["calories_per_100g"] * z[p["name"]].varValue for p in products)
-total_fats = sum(p["fats_per_100g"] * z[p["name"]].varValue for p in products)
-total_carbs = sum(p["carbs_per_100g"] * z[p["name"]].varValue for p in products)
+total_calories = sum(p["calories_per_100g"] * x[p["name"]].varValue for p in products)
+total_fats = sum(p["fats_per_100g"] * x[p["name"]].varValue for p in products)
+total_carbs = sum(p["carbs_per_100g"] * x[p["name"]].varValue for p in products)
 
 
 
