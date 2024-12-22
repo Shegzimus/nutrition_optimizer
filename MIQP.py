@@ -15,7 +15,7 @@ products = [
     {"name": "Brown Rice (1kg)", "price_per_unit": 4.0, "net_weight": 1000, "protein_per_100g": 7.5, "calories_per_100g": 370, "fats_per_100g": 2.7, "carbs_per_100g": 77},
 ]
 
-# Macronutrient Ratios (in percentages)
+# Macronutrient Ratios (in percentages); subject to change based on prefered fitness goals
 protein_ratio = 30  # 30% protein
 fat_ratio = 25      # 25% fats
 carb_ratio = 45     # 45% carbs
@@ -26,7 +26,7 @@ total_calories = (protein_target * 4) / (protein_ratio / 100)
 fat_target = (total_calories * (fat_ratio / 100)) / 9
 carb_target = (total_calories * (carb_ratio / 100)) / 4
 
-# Budget and calorie caps
+# Budget and calorie caps (test values)
 budget_cap = 3000
 calorie_cap = 15000
 
@@ -49,9 +49,9 @@ constraints.append(sum(p["carbs_per_100g"] * z[p["name"]] * 4 for p in products)
 constraints.append(sum(p["price_per_unit"] * x[p["name"]] for p in products) <= budget_cap)
 constraints.append(sum(p["calories_per_100g"] * z[p["name"]] for p in products) <= calorie_cap)
 
-# Linking constraints
+# Connect constraints using net weight and number of whole number purchases
 for p in products:
-    constraints.append(z[p["name"]] * p["net_weight"] * x[p["name"]] == 100 )
+    constraints.append((p["net_weight"] * x[p["name"]]) / z[p["name"]]  == 100 )
 
 # Solve the problem
 problem = cp.Problem(objective, constraints)
